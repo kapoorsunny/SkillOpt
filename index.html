@@ -581,11 +581,17 @@
       font-size: 1rem;
     }
 
-    .split {
+    .ablation-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 16px;
-      align-items: stretch;
+    }
+
+    .ablation-layout table {
+      min-width: 720px;
+    }
+
+    .ablation-summary .mini-list {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .evolution-shell {
@@ -960,7 +966,6 @@
       .manifesto,
       .teaser-heading,
       .section-header,
-      .split,
       .evolution-shell {
         grid-template-columns: 1fr;
       }
@@ -1008,6 +1013,7 @@
       }
 
       .method-grid,
+      .ablation-summary .mini-list,
       .transfer-grid,
       .evolution-footnotes,
       .steps {
@@ -1372,7 +1378,7 @@
         </div>
       </div>
 
-      <div class="split">
+      <div class="ablation-layout">
         <div class="table-wrap">
           <table aria-label="Component ablations">
             <thead>
@@ -1431,7 +1437,7 @@
           </table>
         </div>
 
-        <article class="panel">
+        <article class="panel ablation-summary">
           <h3>What the ablations say</h3>
           <div class="mini-list">
             <div class="mini-item">
