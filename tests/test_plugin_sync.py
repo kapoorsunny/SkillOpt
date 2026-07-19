@@ -18,7 +18,7 @@ PLUGIN_SKILL_MDS = {
 MCP_SERVER = os.path.join(REPO, "plugins/copilot/mcp_server.py")
 COPILOT_INSTRUCTIONS = os.path.join(REPO, "plugins/copilot/copilot-instructions.snippet.md")
 
-CANONICAL_BACKENDS = {"mock", "claude", "codex", "copilot", "cursor"}
+CANONICAL_BACKENDS = {"mock", "claude", "codex", "copilot"}
 CURSOR_MANIFEST = os.path.join(REPO, "plugins/cursor/.cursor-plugin/plugin.json")
 CURSOR_MARKETPLACE = os.path.join(REPO, ".cursor-plugin/marketplace.json")
 CURSOR_COMMAND = os.path.join(REPO, "plugins/cursor/commands/skillopt-sleep.md")
@@ -104,7 +104,7 @@ class TestPluginParity(unittest.TestCase):
             self.assertIn("`--force`", text)
             self.assertNotIn("explicit approval", text.lower())
 
-    def test_openclaw_forwards_cursor_arguments_explicitly(self):
+    def test_openclaw_wrapper_matches_shared_backend_signature(self):
         text = _read(OPENCLAW_RUNNER)
         self.assertIn('cursor_path=""', text)
         self.assertIn('project_dir=""', text)

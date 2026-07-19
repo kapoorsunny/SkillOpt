@@ -61,7 +61,7 @@ Requires Python ≥ 3.10. No third-party packages — the server is pure stdlib.
 | `sleep_schedule` | install a nightly cron entry (`--hour` / `--minute`) |
 | `sleep_unschedule` | remove the nightly cron entry |
 
-Default backend is `mock` (no API spend); the `claude`, `codex`, `copilot`, and `cursor`
+Default backend is `mock` (no API spend); the `claude`, `codex`, and `copilot`
 backends use the corresponding authenticated CLI and budget. The `handoff`
 backend runs the cycle with no model subprocess or API key — the engine writes
 pending model calls to `.skillopt-sleep-handoff/PROMPTS.md` + `pending.json`

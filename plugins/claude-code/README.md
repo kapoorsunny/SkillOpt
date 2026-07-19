@@ -33,8 +33,7 @@ then adopt or discard" contract). Every adopt backs up the prior file first.
 ## Install
 
 **Requirements:** Python ≥ 3.10. A real CLI backend additionally requires its
-corresponding `claude`, `codex`, or `cursor-agent` executable on `PATH` and
-authenticated.
+corresponding `claude` or `codex` executable on `PATH` and authenticated.
 
 ```bash
 # 1) get the code (the plugin ships inside the SkillOpt repo)
@@ -79,12 +78,10 @@ Or call the engine directly (Python ≥ 3.10):
 python -m skillopt_sleep run --project "$(pwd)" --scope invoked --backend mock
 python -m skillopt_sleep run --project "$(pwd)" --backend claude   # real lift via Claude
 python -m skillopt_sleep run --project "$(pwd)" --backend codex    # real lift via Codex
-python -m skillopt_sleep run --project "$(pwd)" --backend cursor   # real lift via Cursor Agent
 ```
 
 Default backend is **`mock`** — deterministic, no API spend — so you can try the
-plumbing for free. Switch to `--backend claude`, `--backend codex`, or
-`--backend cursor` for
+plumbing for free. Switch to `--backend claude` or `--backend codex` for
 model-driven mining and optimization on your own budget; an accepted gain is
 task- and model-dependent, not guaranteed.
 
