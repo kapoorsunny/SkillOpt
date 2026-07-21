@@ -10,12 +10,13 @@ CI use. With backend="anthropic" it spends the user's budget for real lift.
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from dataclasses import dataclass
 from typing import List, Optional
 
 from skillopt_sleep import evidence
-from skillopt_sleep.backend import Backend, build_backend
+from skillopt_sleep.backend import Backend, CursorBackendError, build_backend
 from skillopt_sleep.evidence import EvidenceLog
 from skillopt_sleep.config import SleepConfig, load_config
 from skillopt_sleep.dream import dream_consolidate
@@ -56,6 +57,20 @@ def _read(path: str) -> str:
 def _progress(cfg: SleepConfig, message: str) -> None:
     if cfg.get("progress", False):
         print(f"[sleep] {message}", file=sys.stderr, flush=True)
+
+
+def _discard_unstaged_evidence(path: str) -> None:
+    """Remove a pre-created evidence folder after a fail-closed Cursor call."""
+    if not path:
+        return
+    shutil.rmtree(path, ignore_errors=True)
+    # Avoid leaving an otherwise empty project .skillopt-sleep tree. Stop at
+    # the first non-empty directory so existing nights are never disturbed.
+    for parent in (os.path.dirname(path), os.path.dirname(os.path.dirname(path))):
+        try:
+            os.rmdir(parent)
+        except OSError:
+            break
 
 
 def _render_report_md(report: SleepReport, cfg: SleepConfig) -> str:
@@ -137,6 +152,9 @@ def run_sleep_cycle(
     # the report will land; dry-runs log into the state dir instead.
     ev = None
     staging_dir_pre = ""
+    # Callers may reuse a backend object across nights. Detach any logger from
+    # an earlier run before honoring this run's evidence_log setting.
+    evidence.attach(backend, None)
     if cfg.get("evidence_log", True):
         from skillopt_sleep.staging import _ts_dir, new_staging_dir
         if dry_run:
@@ -242,16 +260,20 @@ def run_sleep_cycle(
             f"mine start: max_tasks={max_tasks} candidate_limit={candidate_limit} "
             f"llm_mine={llm_miner is not None} target_filter={target_filter}",
         )
-        tasks = mine(
-            digests,
-            max_tasks=max_tasks,
-            candidate_limit=candidate_limit,
-            holdout_fraction=cfg.get("holdout_fraction", 0.34),
-            seed=cfg.get("seed", 42),
-            llm_miner=llm_miner,
-            target_skill_text=raw_skill if target_filter else "",
-            target_skill_path=live_skill_path if target_filter else "",
-        )
+        try:
+            tasks = mine(
+                digests,
+                max_tasks=max_tasks,
+                candidate_limit=candidate_limit,
+                holdout_fraction=cfg.get("holdout_fraction", 0.34),
+                seed=cfg.get("seed", 42),
+                llm_miner=llm_miner,
+                target_skill_text=raw_skill if target_filter else "",
+                target_skill_path=live_skill_path if target_filter else "",
+            )
+        except CursorBackendError:
+            _discard_unstaged_evidence(staging_dir_pre)
+            raise
         _progress(cfg, f"mine done: tasks={len(tasks)}")
 
     if ev is not None:
@@ -293,20 +315,24 @@ def run_sleep_cycle(
     history_tasks = []
     if recall_k > 0:
         history_tasks = [TaskRecord.from_dict(d) for d in state.task_archive()]
-    result = dream_consolidate(
-        backend, tasks, skill, memory,
-        history_tasks=history_tasks,
-        recall_k=recall_k,
-        dream_rollouts=int(cfg.get("dream_rollouts", 1) or 1),
-        dream_factor=int(cfg.get("dream_factor", 0) or 0),
-        edit_budget=cfg.get("edit_budget", 4),
-        gate_metric=cfg.get("gate_metric", "mixed"),
-        gate_mixed_weight=cfg.get("gate_mixed_weight", 0.5),
-        gate_mode=cfg.get("gate_mode", "on"),
-        evolve_skill=cfg.get("evolve_skill", True),
-        evolve_memory=cfg.get("evolve_memory", True),
-        night=night,
-    )
+    try:
+        result = dream_consolidate(
+            backend, tasks, skill, memory,
+            history_tasks=history_tasks,
+            recall_k=recall_k,
+            dream_rollouts=int(cfg.get("dream_rollouts", 1) or 1),
+            dream_factor=int(cfg.get("dream_factor", 0) or 0),
+            edit_budget=cfg.get("edit_budget", 4),
+            gate_metric=cfg.get("gate_metric", "mixed"),
+            gate_mixed_weight=cfg.get("gate_mixed_weight", 0.5),
+            gate_mode=cfg.get("gate_mode", "on"),
+            evolve_skill=cfg.get("evolve_skill", True),
+            evolve_memory=cfg.get("evolve_memory", True),
+            night=night,
+        )
+    except CursorBackendError:
+        _discard_unstaged_evidence(staging_dir_pre)
+        raise
     # archive tonight's real (non-dream) tasks so future nights can recall them
     state.add_to_archive([t.to_dict() for t in tasks if t.origin != "dream"])
     _progress(

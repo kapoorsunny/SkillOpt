@@ -14,6 +14,7 @@ import unittest
 from unittest import mock
 
 from skillopt_sleep import prompts as prompt_registry
+from skillopt_sleep.backend import MockBackend
 from skillopt_sleep.config import load_config
 from skillopt_sleep.cycle import run_sleep_cycle
 from skillopt_sleep.evidence import EvidenceLog, read_events
@@ -44,6 +45,23 @@ class TestEvidenceLog(unittest.TestCase):
             self.assertLessEqual(len(events[0]["prompt"]), 260)
             self.assertNotIn("sk-abcdefghijklmnop", json.dumps(events))
             self.assertIn("REDACTED", events[0]["secret"])
+
+    def test_structured_secret_is_redacted_before_truncation(self):
+        private_key = (
+            "-----BEGIN PRIVATE KEY-----\n"
+            + "A" * 500
+            + "\n-----END PRIVATE KEY-----"
+        )
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "e.jsonl")
+            EvidenceLog(path, max_chars=200).log(
+                "replay", "model_call", response=private_key
+            )
+            persisted = json.dumps(read_events(path))
+
+        self.assertIn("REDACTED_PRIVATE_KEY", persisted)
+        self.assertNotIn("BEGIN PRIVATE KEY", persisted)
+        self.assertNotIn("A" * 100, persisted)
 
     def test_reader_skips_corrupt_lines(self):
         with tempfile.TemporaryDirectory() as d:
@@ -139,6 +157,39 @@ class TestCycleEvidence(unittest.TestCase):
         outcome = self._run(evidence_log=False)
         self.assertFalse(
             os.path.exists(os.path.join(outcome.staging_dir, "evidence.jsonl")))
+
+    def test_disabling_evidence_detaches_reused_backend_logger(self):
+        backend = MockBackend()
+        tasks = assign_splits(researcher_persona(), holdout_fraction=0.34, seed=42)
+        with tempfile.TemporaryDirectory() as d:
+            first_project = os.path.join(d, "first")
+            second_project = os.path.join(d, "second")
+            os.makedirs(first_project)
+            os.makedirs(second_project)
+            first_cfg = load_config(
+                invoked_project=first_project,
+                projects="invoked",
+                backend="mock",
+                state_dir=os.path.join(d, "first-state"),
+            )
+            first = run_sleep_cycle(first_cfg, seed_tasks=tasks, backend=backend)
+            first_log = os.path.join(first.staging_dir, "evidence.jsonl")
+            first_size = os.path.getsize(first_log)
+
+            second_cfg = load_config(
+                invoked_project=second_project,
+                projects="invoked",
+                backend="mock",
+                state_dir=os.path.join(d, "second-state"),
+                evidence_log=False,
+            )
+            second = run_sleep_cycle(second_cfg, seed_tasks=tasks, backend=backend)
+
+            self.assertEqual(os.path.getsize(first_log), first_size)
+            self.assertIsNone(backend.evidence)
+            self.assertFalse(
+                os.path.exists(os.path.join(second.staging_dir, "evidence.jsonl"))
+            )
 
     def test_no_tasks_night_is_not_adoptable_but_keeps_evidence(self):
         from skillopt_sleep.staging import latest_staging

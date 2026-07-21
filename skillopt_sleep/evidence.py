@@ -16,8 +16,8 @@ answer *why*. This module records the full causal chain, per night:
 
 Design constraints (matching the sleep engine's contract):
   * pure stdlib, thread-safe (replay batches run in a thread pool);
-  * every persisted string passes through ``redact_secrets`` and a length
-    cap, so the log can never leak more than diagnostics already could;
+  * every persisted string passes through best-effort ``redact_secrets``
+    before the per-field length cap is applied;
   * append-only JSONL so a crashed night still leaves its partial chain;
   * zero behavior change when disabled (``evidence_log: false``).
 
@@ -54,10 +54,15 @@ class EvidenceLog:
     # ── sanitization ──────────────────────────────────────────────────────
     def _clean(self, value: Any) -> Any:
         if isinstance(value, str):
+            # Redact first: truncating a structured secret such as a PEM block
+            # can remove its closing marker and make it unrecognizable to the
+            # redactor while leaving the secret body in the persisted prefix.
+            if self.redact:
+                value = redact_secrets(value)
             if len(value) > self.max_chars:
                 dropped = len(value) - self.max_chars
                 value = value[: self.max_chars] + f"…[truncated {dropped} chars]"
-            return redact_secrets(value) if self.redact else value
+            return value
         if isinstance(value, dict):
             return {k: self._clean(v) for k, v in value.items()}
         if isinstance(value, (list, tuple)):
