@@ -5,7 +5,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "\"${DEVIN_PROJECT_DIR}/.devin/hooks/on-session-end.sh\"",
+          "command": "\"${DEVIN_PROJECT_DIR}/.devin/hooks/skillopt-sleep-on-session-end.sh\"",
           "timeout": 5
         }
       ]

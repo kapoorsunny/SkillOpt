@@ -18,7 +18,7 @@ source into the Claude Code-compatible JSONL the engine reads.
 | `mcp-config.example.json` | drop-in MCP server config |
 | `install.sh` | copies hooks + rules into a project's `.devin/` and prints the MCP registration command |
 | `devin-rules.snippet.md` | copied to `.devin/rules/skillopt-sleep.md` by `install.sh` |
-| `hooks/hooks.v1.json` | SessionEnd hook config — copied to `.devin/hooks.v1.json` by `install.sh` |
+| `hooks/hooks.v1.json` | SessionEnd hook config — installed/merged at `.devin/hooks.v1.json` by `install.sh` |
 | `hooks/on-session-end.sh` | best-effort activity marker script (called by the hook) |
 
 ## What it harvests
@@ -44,9 +44,11 @@ Requires Python ≥ 3.10. No third-party packages — the server is pure stdlib.
 
    This copies the SessionEnd hook and rules snippet into the project's
    `.devin/` directory and prints the MCP registration command. The hook is
-   on by default — it logs a cheap activity marker when each session ends so
-   the next nightly cycle knows there is fresh data to harvest. It is
-   non-blocking and spends no API budget. Re-run the script to update.
+   on by default — it logs a cheap activity marker for local inspection or
+   external automation when each session ends. The current engine harvests by
+   transcript timestamps and does not consume this marker directly. The hook
+   is non-blocking and spends no API budget. Re-run the script to update; the
+   installer preserves existing hooks and does not duplicate its own entry.
 
 2. **Register the MCP server.** Use `mcp-config.example.json` as a template, or
    run the command printed by `install.sh`:
