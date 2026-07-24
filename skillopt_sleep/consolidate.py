@@ -54,12 +54,13 @@ def _split(tasks: List[TaskRecord]) -> Tuple[List[TaskRecord], List[TaskRecord]]
 
     train = [t for t in tasks if _norm(t.split) == "train"]
     val = [t for t in tasks if _norm(t.split) == "val"]
-    # be robust if a split is empty: fall back so a night still does something,
-    # but never silently use test as val.
-    test = [t for t in tasks if _norm(t.split) == "test"]
+    # Be robust if a split is empty: fall back so a night still does something,
+    # but never silently use test as train or val. An all-test batch therefore
+    # returns empty train/val (caller scores test separately; gate is a no-op).
     if not val:
-        # prefer train as the gate reference over nothing; last resort all-but-test
-        val = train or [t for t in tasks if _norm(t.split) != "test"] or tasks
+        # Prefer train as the gate reference; otherwise any non-test tasks.
+        # Do not fall back to the full task list (that would leak held-out test).
+        val = train or [t for t in tasks if _norm(t.split) != "test"]
     if not train:
         train = val
     return train, val
